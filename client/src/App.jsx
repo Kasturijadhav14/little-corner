@@ -31,3 +31,5 @@ function SearchPage({setPage}){const [q,setQ]=useState(''),[mood,setMood]=useSta
 
 function App(){const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('ak_user'))}catch{return null}}),[page,setPage]=useState('home');if(!user||!token())return <Login onLogin={setUser}/>;const logout=()=>{localStorage.removeItem('ak_token');localStorage.removeItem('ak_user');setUser(null)};let content=page==='home'?<Home setPage={setPage}/>:page==='gallery'?<Gallery setPage={setPage}/>:page==='search'?<SearchPage setPage={setPage}/>:page==='create'?<Create setPage={setPage}/>:page.startsWith('edit:')?<Create setPage={setPage} editId={page.slice(5)}/>:page.startsWith('memory:')?<Memory setPage={setPage} id={page.slice(7)}/>:<Home setPage={setPage}/>;return <Shell user={user} onLogout={logout} setPage={setPage}>{content}</Shell>}
 createRoot(document.getElementById('root')).render(<App/>);
+
+export default App;
