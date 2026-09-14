@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; font-family: Inter, sans-serif; background:#090909; color:#F5F1EB; }
+* { box-sizing:border-box; }
+body { margin:0; min-width:320px; background:#090909; }
+button,input,textarea,select { font:inherit; }
+::selection { background:#8B1E2D; color:#F5F1EB; }
+
+@keyframes floatUp { 0%{transform:translateY(30px) scale(.9);opacity:0} 50%{opacity:.7} 100%{transform:translateY(-110vh) scale(1.15);opacity:0} }
+@keyframes petal { 0%{transform:translate3d(0,-10vh,0) rotate(0);opacity:0} 15%{opacity:.7} 100%{transform:translate3d(130px,110vh,0) rotate(500deg);opacity:0} }
+@keyframes shimmer { 0%,100%{opacity:.25} 50%{opacity:.65} }
+@keyframes pulseGlow { 0%,100%{box-shadow:0 0 18px rgba(212,163,115,.05)} 50%{box-shadow:0 0 35px rgba(212,163,115,.18)} }
+@keyframes rise { from{transform:translateY(12px);opacity:0} to{transform:none;opacity:1} }
+.animate-rise { animation:rise .65s ease both; }
+.ambient { animation:shimmer 5s ease-in-out infinite; }
+.glass { background:rgba(22,22,22,.62); border:1px solid rgba(245,241,235,.09); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+.glow-btn { animation:pulseGlow 4s ease-in-out infinite; }
+.rich-editor [contenteditable] { min-height:240px; outline:none; }
+.rich-editor [contenteditable]:empty:before { content:attr(data-placeholder); color:#777; }
+.prose-romance h1,.prose-romance h2,.prose-romance h3 { font-family:"Cormorant Garamond",serif; color:#D4A373; }
+.prose-romance p { margin:.8em 0; line-height:1.85; }
+.prose-romance blockquote { border-left:2px solid #8B1E2D; padding-left:1rem; color:#d4a373; font-family:"Cormorant Garamond",serif; font-size:1.25rem; }
+.scrollbar::-webkit-scrollbar{width:6px}.scrollbar::-webkit-scrollbar-thumb{background:#5B0E1A;border-radius:9px}
