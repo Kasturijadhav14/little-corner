@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS memories (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS memory_reads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(memory_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS memory_media (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
@@ -58,6 +67,7 @@ CREATE TABLE IF NOT EXISTS comments (
 CREATE INDEX IF NOT EXISTS memories_date_idx ON memories(memory_at DESC);
 CREATE INDEX IF NOT EXISTS memories_author_idx ON memories(author_id);
 CREATE INDEX IF NOT EXISTS memory_media_memory_idx ON memory_media(memory_id);
+CREATE INDEX IF NOT EXISTS memory_reads_memory_idx ON memory_reads(memory_id);
 CREATE INDEX IF NOT EXISTS comments_memory_idx ON comments(memory_id);
 CREATE INDEX IF NOT EXISTS reactions_memory_idx ON reactions(memory_id);
 

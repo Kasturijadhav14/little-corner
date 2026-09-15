@@ -29,7 +29,9 @@ const publicMemory = (m) => ({
   id:m.id, title:m.title, contentHtml:m.content_html, mood:m.mood, memoryAt:m.memory_at,
   location:m.location, backgroundStyle:m.background_style,
   authorId:m.author_id, authorName:m.author_name,
-  createdAt:m.created_at, updatedAt:m.updated_at
+  createdAt:m.created_at, updatedAt:m.updated_at,
+  seenByOther: Boolean(m.seen_by_other), seenByOtherAt:m.seen_by_other_at || null,
+  seenByMe: Boolean(m.seen_by_me), seenByMeAt:m.seen_by_me_at || null
 });
 
 async function verifyMemoryPassword(memoryId, userId, password) {
@@ -53,7 +55,14 @@ router.get('/', async (req,res,next) => {
     if (mood) { values.push(mood); where.push(`m.mood=$${values.length}`); }
     if (from) { values.push(from); where.push(`m.memory_at >= $${values.length}::timestamptz`); }
     if (to) { values.push(to); where.push(`m.memory_at <= $${values.length}::timestamptz`); }
-    const sql = `SELECT m.*, u.display_name author_name FROM memories m JOIN users u ON u.id=m.author_id
+    values.push(req.user.id);
+    const viewerParam = `$${values.length}`;
+    const sql = `SELECT m.*, u.display_name author_name,
+      EXISTS(SELECT 1 FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id<>m.author_id) AS seen_by_other,
+      (SELECT mr.first_seen_at FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id<>m.author_id ORDER BY mr.first_seen_at LIMIT 1) AS seen_by_other_at,
+      EXISTS(SELECT 1 FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id=${viewerParam}) AS seen_by_me,
+      (SELECT mr.first_seen_at FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id=${viewerParam} LIMIT 1) AS seen_by_me_at
+      FROM memories m JOIN users u ON u.id=m.author_id
       ${where.length ? 'WHERE '+where.join(' AND ') : ''} ORDER BY m.memory_at DESC`;
     const { rows } = await pool.query(sql, values);
     res.json(rows.map(publicMemory));
@@ -93,7 +102,9 @@ router.post('/:id/unlock', async (req,res,next) => {
   try {
     const check = await verifyMemoryPassword(req.params.id, req.user.id, req.body?.password);
     if (!check.ok) return res.status(check.status).json({message:check.message});
-    const full = await getMemory(req.params.id);
+    await pool.query(`INSERT INTO memory_reads(memory_id,user_id) VALUES($1,$2)
+      ON CONFLICT(memory_id,user_id) DO UPDATE SET last_seen_at=NOW()`,[req.params.id,req.user.id]);
+    const full = await getMemory(req.params.id, req.user.id);
     res.json({ memory:full });
   } catch(e){ next(e); }
 });
@@ -179,8 +190,12 @@ async function reactions(id){
   const {rows}=await pool.query(`SELECT r.id,r.reaction,r.created_at,u.display_name FROM reactions r JOIN users u ON u.id=r.user_id WHERE r.memory_id=$1 ORDER BY r.created_at`,[id]);
   return rows;
 }
-async function getMemory(id){
-  const m=await pool.query(`SELECT m.*,u.display_name author_name FROM memories m JOIN users u ON u.id=m.author_id WHERE m.id=$1`,[id]);
+async function getMemory(id, viewerId=null){
+  const m=await pool.query(`SELECT m.*,u.display_name author_name,
+    EXISTS(SELECT 1 FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id<>m.author_id) AS seen_by_other,
+    (SELECT mr.first_seen_at FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id<>m.author_id ORDER BY mr.first_seen_at LIMIT 1) AS seen_by_other_at,
+    ${viewerId ? 'EXISTS(SELECT 1 FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id=$2) AS seen_by_me, (SELECT mr.first_seen_at FROM memory_reads mr WHERE mr.memory_id=m.id AND mr.user_id=$2 LIMIT 1) AS seen_by_me_at' : 'FALSE AS seen_by_me, NULL AS seen_by_me_at'}
+    FROM memories m JOIN users u ON u.id=m.author_id WHERE m.id=$1`, viewerId ? [id,viewerId] : [id]);
   if(!m.rows[0]) return null;
   const media=await pool.query(`SELECT id,media_type,original_name,stored_name,mime_type,size_bytes,created_at FROM memory_media WHERE memory_id=$1 ORDER BY created_at`,[id]);
   const comments=await pool.query(`SELECT c.id,c.text,c.emoji,c.created_at,u.display_name FROM comments c JOIN users u ON u.id=c.user_id WHERE c.memory_id=$1 ORDER BY c.created_at`,[id]);
