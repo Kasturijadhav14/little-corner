@@ -67,7 +67,7 @@ router.post('/', upload.array('media', 30), async (req,res,next) => {
     const { title, contentHtml='', mood='❤️', memoryAt, location='', backgroundStyle='wine' } = req.body;
     if (!title?.trim()) return res.status(400).json({ message:'Title is required.' });
     await client.query('BEGIN');
-    const hash = await bcrypt.hash(require('crypto').randomUUID(), 12);
+    const hash = await bcrypt.hash(crypto.randomUUID(), 12);
     const result = await client.query(
       `INSERT INTO memories(author_id,title,content_html,mood,memory_at,location,background_style,note_password_hash)
        VALUES($1,$2,$3,$4,COALESCE($5::timestamptz,NOW()),NULLIF($6,''),$7,$8)
@@ -194,6 +194,7 @@ async function getMemory(id, viewerId=null){
   return {...publicMemory(m.rows[0]),media:media.rows.map(x=>({...x,url:`/uploads/${x.stored_name}`})),reactions:await reactions(id),comments:comments.rows};
 }
 export default router;
+
 
 
 
