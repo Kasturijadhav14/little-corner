@@ -34,14 +34,6 @@ const publicMemory = (m) => ({
   seenByMe: Boolean(m.seen_by_me), seenByMeAt:m.seen_by_me_at || null
 });
 
-async function verifyMemoryPassword(memoryId, userId, password) {
-  const { rows } = await pool.query('SELECT id, note_password_hash FROM memories WHERE id=$1', [memoryId]);
-  if (!rows[0]) return { ok:false, status:404, message:'Memory not found.' };
-  if (!(await bcrypt.compare(password || '', rows[0].note_password_hash))) {
-    return { ok:false, status:403, message:'Access denied. Wrong memory password.' };
-  }
-  return { ok:true };
-}
 
 router.get('/', async (req,res,next) => {
   try {
@@ -72,10 +64,10 @@ router.get('/', async (req,res,next) => {
 router.post('/', upload.array('media', 30), async (req,res,next) => {
   const client = await pool.connect();
   try {
-    const { title, contentHtml='', mood='❤️', memoryAt, location='', backgroundStyle='wine', notePassword } = req.body;
-    if (!title?.trim() || !notePassword) return res.status(400).json({ message:'Title and memory password are required.' });
+    const { title, contentHtml='', mood='❤️', memoryAt, location='', backgroundStyle='wine' } = req.body;
+    if (!title?.trim()) return res.status(400).json({ message:'Title is required.' });
     await client.query('BEGIN');
-    const hash = await bcrypt.hash(notePassword, 12);
+    const hash = await bcrypt.hash(require('crypto').randomUUID(), 12);
     const result = await client.query(
       `INSERT INTO memories(author_id,title,content_html,mood,memory_at,location,background_style,note_password_hash)
        VALUES($1,$2,$3,$4,COALESCE($5::timestamptz,NOW()),NULLIF($6,''),$7,$8)
@@ -100,8 +92,8 @@ router.post('/', upload.array('media', 30), async (req,res,next) => {
 
 router.post('/:id/unlock', async (req,res,next) => {
   try {
-    const check = await verifyMemoryPassword(req.params.id, req.user.id, req.body?.password);
-    if (!check.ok) return res.status(check.status).json({message:check.message});
+    const exists = await pool.query('SELECT id FROM memories WHERE id=$1',[req.params.id]);
+    if (!exists.rows[0]) return res.status(404).json({message:'Memory not found.'});
     await pool.query(`INSERT INTO memory_reads(memory_id,user_id) VALUES($1,$2)
       ON CONFLICT(memory_id,user_id) DO UPDATE SET last_seen_at=NOW()`,[req.params.id,req.user.id]);
     const full = await getMemory(req.params.id, req.user.id);
@@ -112,8 +104,8 @@ router.post('/:id/unlock', async (req,res,next) => {
 router.put('/:id', upload.array('media', 30), async (req,res,next) => {
   const client = await pool.connect();
   try {
-    const { password, title, contentHtml='', mood='❤️', memoryAt, location='', backgroundStyle='wine', deleteMediaIds='[]' } = req.body;
-    const check = await verifyMemoryPassword(req.params.id, req.user.id, password);
+    const { title, contentHtml='', mood='❤️', memoryAt, location='', backgroundStyle='wine', deleteMediaIds='[]' } = req.body;
+    const check = { ok:true };
     if (!check.ok) return res.status(check.status).json({message:check.message});
     await client.query('BEGIN');
     await client.query(
@@ -177,7 +169,7 @@ router.get('/:id/gallery', async(req,res,next)=>{
 
 router.delete('/:id', async(req,res,next)=>{
   try{
-    const check=await verifyMemoryPassword(req.params.id,req.user.id,req.body?.password);
+    const check={ok:true};
     if(!check.ok) return res.status(check.status).json({message:check.message});
     const media=await pool.query('SELECT stored_name FROM memory_media WHERE memory_id=$1',[req.params.id]);
     await pool.query('DELETE FROM memories WHERE id=$1',[req.params.id]);
@@ -202,3 +194,7 @@ async function getMemory(id, viewerId=null){
   return {...publicMemory(m.rows[0]),media:media.rows.map(x=>({...x,url:`/uploads/${x.stored_name}`})),reactions:await reactions(id),comments:comments.rows};
 }
 export default router;
+
+
+
+
