@@ -169,8 +169,9 @@ router.get('/:id/gallery', async(req,res,next)=>{
 
 router.delete('/:id', async(req,res,next)=>{
   try{
-    const check={ok:true};
-    if(!check.ok) return res.status(check.status).json({message:check.message});
+    const owner=await pool.query('SELECT author_id FROM memories WHERE id=$1',[req.params.id]);
+    if(!owner.rows[0]) return res.status(404).json({message:'Memory not found.'});
+    if(owner.rows[0].author_id!==req.user.id) return res.status(403).json({message:'Only the memory author can delete it.'});
     const media=await pool.query('SELECT stored_name FROM memory_media WHERE memory_id=$1',[req.params.id]);
     await pool.query('DELETE FROM memories WHERE id=$1',[req.params.id]);
     for(const m of media.rows) fs.rm(path.join(uploadRoot,m.stored_name),{force:true},()=>{});
